@@ -47,7 +47,7 @@ pipeline:
                                     msys*)   os="windows" ;;
                                     *)       echo "unknown os: <+pipeline.variables.OSTYPE>"; exit 1 ;;
                                   esac
-                                  curl -SL --fail -o /tmp/vault.zip https://releases.hashicorp.com/vault/"<< parameters.version >>"/vault_"<< parameters.version >>"_"${os}"_amd64.zip
+                                  curl -SL --fail -o /tmp/vault.zip https://releases.hashicorp.com/vault/"<< parameters.version >>"/vault_"<< parameters.version >>"_"<+pipeline.variables.OSTYPE>"_amd64.zip
                                   if [[ "${os}" != "windows" ]]; then
                                     sudo unzip -d /usr/local/bin /tmp/vault.zip
                                     rm -rf /tmp/vault*
