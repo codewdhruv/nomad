@@ -56,3 +56,8 @@ pipeline:
                                     unzip /tmp/vault.zip -d "/c/Windows"
                                     rm -rf /tmp/vault*
                                   fi
+  variables:
+    - name: OSTYPE
+      type: String
+      description: ""
+      value: <+input>
