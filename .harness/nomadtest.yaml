@@ -1,0 +1,37 @@
+pipeline:
+  name: nomad-test
+  identifier: nomadtest
+  projectIdentifier: DhrubaCI
+  orgIdentifier: default
+  tags: {}
+  properties:
+    ci:
+      codebase:
+        connectorRef: dhrubaaccountconnector
+        repoName: nomad
+        build: <+input>
+  stages:
+    - stage:
+        name: build
+        identifier: build
+        description: ""
+        type: CI
+        spec:
+          cloneCodebase: true
+          platform:
+            os: Linux
+            arch: Amd64
+          runtime:
+            type: Cloud
+            spec: {}
+          execution:
+            steps:
+              - step:
+                  type: Run
+                  name: install buf
+                  identifier: install_buf
+                  spec:
+                    shell: Sh
+                    command: |-
+                      |
+                                  sudo ./scripts/vagrant-linux-priv-buf.sh
