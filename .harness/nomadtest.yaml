@@ -50,11 +50,11 @@ pipeline:
                                     export GOARCH="$GOTESTARCH";
                                   fi
                                   mkdir -p /tmp/test-reports
-                                  sudo -E PATH="$GOPATH/bin:/usr/local/go/bin:$PATH" make generate-structs
+                                  sudo -E PATH="$GOPATH/bin" make generate-structs
                                   if [ ! -z $GOTEST_MOD ]; then
-                                    sudo -E PATH="$GOPATH/bin:/usr/local/go/bin:$PATH" make test-nomad-module
+                                    sudo -E PATH="$GOPATH/bin" make test-nomad-module
                                   else
-                                    sudo -E PATH="$GOPATH/bin:/usr/local/go/bin:$PATH" make test-nomad
+                                    sudo -E PATH="$GOPATH/bin" make test-nomad
                                   fi
                   timeout: 20s
   variables:
