@@ -31,5 +31,7 @@ pipeline:
                   name: Backport changes to stable-website
                   identifier: Backport_changes_to_stablewebsite
                   spec:
+                    connectorRef: DhrubajyotiDocker
+                    image: hashicorpdev/backport-assistant:0.2.3
                     shell: Sh
                     command: backport-assistant backport -merge-method=squash -automerge
