@@ -41,11 +41,11 @@ pipeline:
                     shell: Sh
                     command: |-
                       set -x
-                                  case "${OSTYPE}" in
+                                  case <+pipeline.variables.OSTYPE> in
                                     linux*)  os="linux" ;;
                                     darwin*) os="darwin" ;;
                                     msys*)   os="windows" ;;
-                                    *)       echo "unknown os: ${OSTYPE}"; exit 1 ;;
+                                    *)       echo "unknown os: <+pipeline.variables.OSTYPE>"; exit 1 ;;
                                   esac
                                   curl -SL --fail -o /tmp/vault.zip https://releases.hashicorp.com/vault/"<< parameters.version >>"/vault_"<< parameters.version >>"_"${os}"_amd64.zip
                                   if [[ "${os}" != "windows" ]]; then
