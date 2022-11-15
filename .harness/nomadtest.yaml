@@ -32,6 +32,4 @@ pipeline:
                   identifier: install_buf
                   spec:
                     shell: Sh
-                    command: |-
-                      |
-                                  sudo ./scripts/vagrant-linux-priv-buf.sh
+                    command: sudo ./scripts/vagrant-linux-priv-buf.sh
