@@ -1,0 +1,35 @@
+pipeline:
+  name: nomad-test-ga
+  identifier: nomadtestga
+  projectIdentifier: DhrubaCI
+  orgIdentifier: default
+  tags: {}
+  properties:
+    ci:
+      codebase:
+        connectorRef: dhrubaaccountconnector
+        repoName: nomad
+        build: <+input>
+  stages:
+    - stage:
+        name: backport
+        identifier: backport
+        description: ""
+        type: CI
+        spec:
+          cloneCodebase: true
+          platform:
+            os: Linux
+            arch: Amd64
+          runtime:
+            type: Cloud
+            spec: {}
+          execution:
+            steps:
+              - step:
+                  type: Run
+                  name: Backport changes to stable-website
+                  identifier: Backport_changes_to_stablewebsite
+                  spec:
+                    shell: Sh
+                    command: backport-assistant backport -merge-method=squash -automerge
