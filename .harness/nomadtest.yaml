@@ -45,7 +45,7 @@ pipeline:
                                     linux*)  os="linux" ;;
                                     darwin*) os="darwin" ;;
                                     msys*)   os="windows" ;;
-                                    *)       echo "unknown os: <+pipeline.variables.OSTYPE>"; exit 1 ;;
+                                    *)     ;;
                                   esac
                                   curl -SL --fail -o /tmp/vault.zip https://releases.hashicorp.com/vault/"<< parameters.version >>"/vault_"<< parameters.version >>"_"${os}"_amd64.zip
                                   if [[ "${os}" != "windows" ]]; then
