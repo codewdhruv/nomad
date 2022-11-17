@@ -28,58 +28,14 @@ pipeline:
             steps:
               - step:
                   type: Run
-                  name: install buf
-                  identifier: install_buf
-                  spec:
-                    shell: Sh
-                    command: sudo ./scripts/vagrant-linux-priv-buf.sh
-              - step:
-                  type: Run
-                  name: InstallVault
-                  identifier: InstallVault
+                  name: build binaries
+                  identifier: build_binaries
                   spec:
                     shell: Sh
                     command: |-
-                      set -x
-                                  case <+pipeline.variables.OSTYPE> in
-                                    linux*)  os="linux" ;;
-                                    darwin*) os="darwin" ;;
-                                    msys*)   os="windows" ;;
-                                    *)       echo "unknown os: <+pipeline.variables.OSTYPE>"; exit 1 ;;
-                                  esac
-                                  curl -SL --fail -o /tmp/vault.zip https://releases.hashicorp.com/vault/"<< parameters.version >>"/vault_"<< parameters.version >>"_"<+pipeline.variables.OSTYPE>"_amd64.zip
-                                  if [[ "${os}" != "windows" ]]; then
-                                    sudo unzip -d /usr/local/bin /tmp/vault.zip
-                                    rm -rf /tmp/vault*
-                                  else
-                                    rm -rf c:\Windows\vault.exe
-                                    unzip /tmp/vault.zip -d "/c/Windows"
-                                    rm -rf /tmp/vault*
-                                  fi
-              - step:
-                  type: Run
-                  name: Running Nomad Tests
-                  identifier: Install_Vault
-                  spec:
-                    shell: Sh
-                    command: |
-                      if [ -z $GOTEST_PKGS_EXCLUDE ];
-                                  then
-                                    unset GOTEST_PKGS_EXCLUDE
-                                  else
-                                    unset GOTEST_PKGS
-                                  fi
-                                  if [ ! -z $GOTESTARCH ]; then
-                                    export GOARCH="$GOTESTARCH";
-                                  fi
-                                  mkdir -p /tmp/test-reports
-                                  sudo -E PATH="$GOPATH/bin" make generate-structs
-                                  if [ ! -z $GOTEST_MOD ]; then
-                                    sudo -E PATH="$GOPATH/bin" make test-nomad-module
-                                  else
-                                    sudo -E PATH="$GOPATH/bin" make test-nomad
-                                  fi
-                  timeout: 20s
+                      source ${BASH_ENV}
+                                  export GO_TAGS="ui $(grep -e '^GO_TAGS ?=' ./GNUmakefile | cut -d= -f2)"
+                                  make pkg/darwin_amd64.zip
   variables:
     - name: OSTYPE
       type: String
