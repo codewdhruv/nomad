@@ -75,6 +75,8 @@ pipeline:
                   name: make deps
                   identifier: make_deps
                   spec:
+                    connectorRef: dockerdelegatedhruba
+                    image: alpine
                     shell: Sh
                     command: make deps
               - step:
