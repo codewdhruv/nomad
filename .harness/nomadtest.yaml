@@ -28,6 +28,8 @@ pipeline:
                   name: save_cache
                   identifier: save_cache
                   spec:
+                    connectorRef: dockerdelegatedhruba
+                    image: alpine
                     shell: Sh
                     command: cd ui && yarn run lint:<+matrix.deps>
                     reports:
