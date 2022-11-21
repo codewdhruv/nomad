@@ -84,6 +84,8 @@ pipeline:
                   name: install-buf
                   identifier: installbuf
                   spec:
+                    connectorRef: dockerdelegatedhruba
+                    image: alpine
                     shell: Sh
                     command: sudo ./scripts/vagrant-linux-priv-buf.sh
               - step:
@@ -91,6 +93,8 @@ pipeline:
                   name: prepare ui cache
                   identifier: prepare_ui_cache
                   spec:
+                    connectorRef: dockerdelegatedhruba
+                    image: alpine
                     shell: Sh
                     command: |
                       git log -n 1 --pretty=format:%H ui > /tmp/ui-sha
@@ -99,6 +103,8 @@ pipeline:
                   name: install-golang
                   identifier: installgolang
                   spec:
+                    connectorRef: dockerdelegatedhruba
+                    image: alpine
                     shell: Sh
                     command: source ${BASH_ENV} && make deps
               - step:
@@ -106,6 +112,8 @@ pipeline:
                   name: restore compiled ui assets
                   identifier: restore_compiled_ui_assets
                   spec:
+                    connectorRef: dockerdelegatedhruba
+                    image: alpine
                     shell: Sh
                     command: |-
                       export GO_TAGS="ui $(grep -e '^GO_TAGS ?=' ./GNUmakefile | cut -d= -f2)"
