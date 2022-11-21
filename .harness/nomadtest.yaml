@@ -40,8 +40,7 @@ pipeline:
                   identifier: installbuf
                   spec:
                     shell: Sh
-                    command: |
-                      sudo -E PATH="$GOPATH/bin:/usr/local/go/bin:$PATH" make generate-structs
+                    command: sudo ./scripts/vagrant-linux-priv-buf.sh
   variables:
     - name: OSTYPE
       type: String
