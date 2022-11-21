@@ -56,18 +56,8 @@ pipeline:
                   spec:
                     shell: Sh
                     command: |-
-                      if [[ -f /tmp/ui-assets/bindata_assetfs.go ]]; then
-                                    cp /tmp/ui-assets/bindata_assetfs.go ./command/agent/bindata_assetfs.go
-                                    exit 0
-                                  fi
-                                  ./scripts/vagrant-linux-unpriv-ui.sh
-                                  export PATH="$HOME/.yarn/bin:$HOME/.config/yarn/global/node_modules/.bin:$PATH"
-                                  export PATH="$GOPATH/bin:/usr/local/go/bin:$PATH"
-                                  . ~/.nvm/nvm.sh
-                                  cd ui && yarn install --frozen-lockfile && cd ..
-                                  JOBS=2 make ember-dist static-assets
-                                  mkdir -p /tmp/ui-assets
-                                  cp ./command/agent/bindata_assetfs.go /tmp/ui-assets/bindata_assetfs.go
+                      export GO_TAGS="ui $(grep -e '^GO_TAGS ?=' ./GNUmakefile | cut -d= -f2)"
+                                  make pkg/windows_amd64.zip pkg/linux_amd64.zip
   variables:
     - name: OSTYPE
       type: String
