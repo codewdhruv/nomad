@@ -28,14 +28,14 @@ pipeline:
             steps:
               - step:
                   type: Run
-                  name: build binaries
-                  identifier: build_binaries
+                  name: test-step
+                  identifier: teststep
                   spec:
                     shell: Sh
                     command: |-
-                      source ${BASH_ENV}
-                                  export GO_TAGS="ui $(grep -e '^GO_TAGS ?=' ./GNUmakefile | cut -d= -f2)"
-                                  make pkg/darwin_amd64.zip
+                      curl -SL --fail -o /tmp/consul.zip https://releases.hashicorp.com/consul/<< parameters.version >>/consul_<< parameters.version >>_linux_amd64.zip
+                                  sudo unzip -d /usr/local/bin /tmp/consul.zip
+                                  rm -rf /tmp/consul*
   variables:
     - name: OSTYPE
       type: String
