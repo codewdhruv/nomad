@@ -6,8 +6,8 @@ pipeline:
   tags: {}
   stages:
     - stage:
-        name: build-binaries
-        identifier: buildbinaries
+        name: test-ui
+        identifier: testui
         description: ""
         type: CI
         spec:
@@ -27,6 +27,33 @@ pipeline:
                   spec:
                     shell: Sh
                     command: cd ui && yarn install --frozen-lockfile
+              - step:
+                  type: Run
+                  name: save_cache
+                  identifier: save_cache
+                  spec:
+                    shell: Sh
+                    command: cd ui && yarn run lint:js
+                    reports:
+                      type: JUnit
+                      spec:
+                        paths:
+                          - ./ui/node_modules
+    - stage:
+        name: build-binaries
+        identifier: buildbinaries
+        description: ""
+        type: CI
+        spec:
+          cloneCodebase: true
+          platform:
+            os: Linux
+            arch: Amd64
+          runtime:
+            type: Cloud
+            spec: {}
+          execution:
+            steps:
               - step:
                   type: Run
                   name: checkout
@@ -72,28 +99,6 @@ pipeline:
                     command: |-
                       export GO_TAGS="ui $(grep -e '^GO_TAGS ?=' ./GNUmakefile | cut -d= -f2)"
                                   make pkg/windows_amd64.zip pkg/linux_amd64.zip
-    - stage:
-        name: test-ui
-        identifier: testui
-        description: ""
-        type: CI
-        spec:
-          cloneCodebase: true
-          platform:
-            os: Linux
-            arch: Amd64
-          runtime:
-            type: Cloud
-            spec: {}
-          execution:
-            steps:
-              - step:
-                  type: Run
-                  name: yarn install
-                  identifier: yarn_install
-                  spec:
-                    shell: Sh
-                    command: cd ui && yarn install --frozen-lockfile
   variables:
     - name: OSTYPE
       type: String
