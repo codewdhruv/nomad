@@ -27,6 +27,13 @@ pipeline:
                   spec:
                     shell: Sh
                     command: apt-get update; apt-get install -y sudo unzip zip
+              - step:
+                  type: Run
+                  name: make deps
+                  identifier: make_deps
+                  spec:
+                    shell: Sh
+                    command: make deps
   variables:
     - name: OSTYPE
       type: String
