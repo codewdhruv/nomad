@@ -34,6 +34,14 @@ pipeline:
                   spec:
                     shell: Sh
                     command: make deps
+              - step:
+                  type: Run
+                  name: install-buf
+                  identifier: installbuf
+                  spec:
+                    shell: Sh
+                    command: |
+                      sudo -E PATH="$GOPATH/bin:/usr/local/go/bin:$PATH" make generate-structs
   variables:
     - name: OSTYPE
       type: String
