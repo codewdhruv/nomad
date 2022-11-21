@@ -41,6 +41,14 @@ pipeline:
                   spec:
                     shell: Sh
                     command: sudo ./scripts/vagrant-linux-priv-buf.sh
+              - step:
+                  type: Run
+                  name: prepare ui cache
+                  identifier: prepare_ui_cache
+                  spec:
+                    shell: Sh
+                    command: |
+                      git log -n 1 --pretty=format:%H ui > /tmp/ui-sha
   variables:
     - name: OSTYPE
       type: String
