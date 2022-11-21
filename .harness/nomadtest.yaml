@@ -33,7 +33,7 @@ pipeline:
                   identifier: save_cache
                   spec:
                     shell: Sh
-                    command: cd ui && yarn run lint:js
+                    command: cd ui && yarn run lint:<+matrix.deps>
                     reports:
                       type: JUnit
                       spec:
