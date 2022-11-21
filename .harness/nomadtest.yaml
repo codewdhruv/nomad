@@ -49,6 +49,25 @@ pipeline:
                     shell: Sh
                     command: |
                       git log -n 1 --pretty=format:%H ui > /tmp/ui-sha
+              - step:
+                  type: Run
+                  name: restore compiled ui assets
+                  identifier: restore_compiled_ui_assets
+                  spec:
+                    shell: Sh
+                    command: |-
+                      if [[ -f /tmp/ui-assets/bindata_assetfs.go ]]; then
+                                    cp /tmp/ui-assets/bindata_assetfs.go ./command/agent/bindata_assetfs.go
+                                    exit 0
+                                  fi
+                                  ./scripts/vagrant-linux-unpriv-ui.sh
+                                  export PATH="$HOME/.yarn/bin:$HOME/.config/yarn/global/node_modules/.bin:$PATH"
+                                  export PATH="$GOPATH/bin:/usr/local/go/bin:$PATH"
+                                  . ~/.nvm/nvm.sh
+                                  cd ui && yarn install --frozen-lockfile && cd ..
+                                  JOBS=2 make ember-dist static-assets
+                                  mkdir -p /tmp/ui-assets
+                                  cp ./command/agent/bindata_assetfs.go /tmp/ui-assets/bindata_assetfs.go
   variables:
     - name: OSTYPE
       type: String
