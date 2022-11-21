@@ -12,12 +12,6 @@ pipeline:
         type: CI
         spec:
           cloneCodebase: true
-          platform:
-            os: Linux
-            arch: Amd64
-          runtime:
-            type: Cloud
-            spec: {}
           execution:
             steps:
               - step:
@@ -46,6 +40,13 @@ pipeline:
                         - js
                         - hbs
                       maxConcurrency: 1
+          infrastructure:
+            type: KubernetesDirect
+            spec:
+              connectorRef: k8sinfra
+              namespace: harness-delegate-ng
+              nodeSelector: {}
+              os: Linux
     - stage:
         name: build-binaries
         identifier: buildbinaries
