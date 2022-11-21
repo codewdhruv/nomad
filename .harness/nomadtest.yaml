@@ -66,6 +66,8 @@ pipeline:
                   name: checkout
                   identifier: checkout
                   spec:
+                    connectorRef: dockerdelegatedhruba
+                    image: alpine
                     shell: Sh
                     command: apt-get update; apt-get install -y sudo unzip zip
               - step:
