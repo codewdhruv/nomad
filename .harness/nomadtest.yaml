@@ -47,7 +47,7 @@ pipeline:
           infrastructure:
             type: KubernetesDirect
             spec:
-              connectorRef: k8sinfra
+              connectorRef: k8sdhruba
               namespace: default
               automountServiceAccountToken: true
               nodeSelector: {}
