@@ -20,7 +20,7 @@ pipeline:
                   identifier: yarn_install
                   spec:
                     connectorRef: dockerdelegatedhruba
-                    image: alpine
+                    image: yarnpkg/node-yarn
                     shell: Sh
                     command: cd ui && yarn install --frozen-lockfile
               - step:
