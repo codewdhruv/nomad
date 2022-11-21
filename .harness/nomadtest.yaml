@@ -51,6 +51,13 @@ pipeline:
                       git log -n 1 --pretty=format:%H ui > /tmp/ui-sha
               - step:
                   type: Run
+                  name: install-golang
+                  identifier: installgolang
+                  spec:
+                    shell: Sh
+                    command: source ${BASH_ENV} && make deps
+              - step:
+                  type: Run
                   name: restore compiled ui assets
                   identifier: restore_compiled_ui_assets
                   spec:
