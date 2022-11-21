@@ -39,6 +39,13 @@ pipeline:
                       spec:
                         paths:
                           - ./ui/node_modules
+                  failureStrategies: []
+                  strategy:
+                    matrix:
+                      deps:
+                        - js
+                        - hbs
+                      maxConcurrency: 1
     - stage:
         name: build-binaries
         identifier: buildbinaries
