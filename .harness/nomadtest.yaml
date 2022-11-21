@@ -41,3 +41,7 @@ pipeline:
       type: String
       description: ""
       value: <+input>
+    - name: go_machine_image
+      type: String
+      description: ""
+      value: "&go_machine_image     ubuntu-2004:202111-02"
