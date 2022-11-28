@@ -116,8 +116,12 @@ pipeline:
                     command: |-
                       export GO_TAGS="ui $(grep -e '^GO_TAGS ?=' ./GNUmakefile | cut -d= -f2)"
                                   make pkg/windows_amd64.zip pkg/linux_amd64.zip
-          infrastructure:
-            useFromStage: testui
+          platform:
+            os: Linux
+            arch: Amd64
+          runtime:
+            type: Docker
+            spec: {}
   variables:
     - name: OSTYPE
       type: String
