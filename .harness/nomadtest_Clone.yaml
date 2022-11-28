@@ -98,61 +98,28 @@ pipeline:
             steps:
               - step:
                   type: Run
-                  name: checkout
+                  name: "build binaries "
                   identifier: checkout
                   spec:
                     connectorRef: DhrubajyotiDocker
-                    image: alpine
+                    image: docker.mirror.hashicorp.services/golang:1.19.3
                     shell: Sh
-                    command: apt-get update; apt-get install -y sudo unzip zip
-              - step:
-                  type: Run
-                  name: make deps
-                  identifier: make_deps
-                  spec:
-                    connectorRef: DhrubajyotiDocker
-                    image: alpine
-                    shell: Sh
-                    command: make deps
-              - step:
-                  type: Run
-                  name: install-buf
-                  identifier: installbuf
-                  spec:
-                    connectorRef: DhrubajyotiDocker
-                    image: alpine
-                    shell: Sh
-                    command: sudo ./scripts/vagrant-linux-priv-buf.sh
-              - step:
-                  type: Run
-                  name: prepare ui cache
-                  identifier: prepare_ui_cache
-                  spec:
-                    connectorRef: DhrubajyotiDocker
-                    image: alpine
-                    shell: Sh
-                    command: |
+                    command: |+
+                      NOMAD_SLOW_TEST=1
+                          GOTESTSUM_JUNITFILE=“/tmp/test-reports/results.xml”
+                          GOTESTSUM_JSONFILE=“/tmp/test-reports/testjsonfile.json”
+                          # disable implicit git paging.  CircleCI runs commands with in a tty
+                          # making git assume it’s an interactive session.
+                          PAGER=“cat”
+                          GIT_PAGER=“cat”
+                          GOPATH="/go"
+
+                      apt-get update; apt-get install -y sudo unzip zip
+                      make deps
+                      sudo -E PATH="$GOPATH/bin:/usr/local/go/bin:$PATH" make generate-structs
+
                       git log -n 1 --pretty=format:%H ui > /tmp/ui-sha
-              - step:
-                  type: Run
-                  name: install-golang
-                  identifier: installgolang
-                  spec:
-                    connectorRef: DhrubajyotiDocker
-                    image: alpine
-                    shell: Sh
-                    command: source export PATH="${GOPATH}/bin:${HOME}/goinstall/go/bin:$PATH && make deps
-              - step:
-                  type: Run
-                  name: restore compiled ui assets
-                  identifier: restore_compiled_ui_assets
-                  spec:
-                    connectorRef: DhrubajyotiDocker
-                    image: alpine
-                    shell: Sh
-                    command: |-
-                      export GO_TAGS="ui $(grep -e '^GO_TAGS ?=' ./GNUmakefile | cut -d= -f2)"
-                                  make pkg/windows_amd64.zip pkg/linux_amd64.zip
+
           platform:
             os: Linux
             arch: Amd64
