@@ -1,139 +1,177 @@
----
 pipeline:
-  projectIdentifier: "DhrubaCI"
-  orgIdentifier: "default"
+  projectIdentifier: DhrubaCI
+  orgIdentifier: default
   tags: {}
   stages:
-  - stage:
-      name: "test-ui"
-      identifier: "testui"
-      description: ""
-      type: "CI"
-      spec:
-        cloneCodebase: true
-        execution:
-          steps:
-          - step:
-              type: "Run"
-              name: "yarn install"
-              identifier: "yarn_install"
-              spec:
-                connectorRef: "dockerdelegatedhruba"
-                image: "node:14.17.1"
-                shell: "Sh"
-                command: "cd ui && yarn install --frozen-lockfile"
-          - step:
-              type: "Run"
-              name: "save_cache"
-              identifier: "save_cache"
-              spec:
-                connectorRef: "dockerdelegatedhruba"
-                image: "node:14.17.1"
-                shell: "Sh"
-                command: "cd ui && yarn run lint:<+matrix.deps>"
-                reports:
-                  type: "JUnit"
+    - stage:
+        name: test-ui
+        identifier: testui
+        description: ""
+        type: CI
+        spec:
+          cloneCodebase: true
+          execution:
+            steps:
+              - step:
+                  type: Run
+                  name: yarn install
+                  identifier: yarn_install
                   spec:
-                    paths:
-                    - "./ui/node_modules"
-              failureStrategies: []
-              strategy:
-                matrix:
-                  deps:
-                  - "js"
-                  - "hbs"
-                  maxConcurrency: 1
-        platform:
-          os: "Linux"
-          arch: "Amd64"
-        runtime:
-          type: "Cloud"
-          spec: {}
-  - stage:
-      name: "build-binaries"
-      identifier: "buildbinaries"
-      description: ""
-      type: "CI"
-      spec:
-        cloneCodebase: true
-        execution:
-          steps:
-          - step:
-              type: "Run"
-              name: "checkout"
-              identifier: "checkout"
-              spec:
-                connectorRef: "dockerdelegatedhruba"
-                image: "alpine"
-                shell: "Sh"
-                command: "apt-get update; apt-get install -y sudo unzip zip"
-          - step:
-              type: "Run"
-              name: "make deps"
-              identifier: "make_deps"
-              spec:
-                connectorRef: "dockerdelegatedhruba"
-                image: "alpine"
-                shell: "Sh"
-                command: "make deps"
-          - step:
-              type: "Run"
-              name: "install-buf"
-              identifier: "installbuf"
-              spec:
-                connectorRef: "dockerdelegatedhruba"
-                image: "alpine"
-                shell: "Sh"
-                command: "sudo ./scripts/vagrant-linux-priv-buf.sh"
-          - step:
-              type: "Run"
-              name: "prepare ui cache"
-              identifier: "prepare_ui_cache"
-              spec:
-                connectorRef: "dockerdelegatedhruba"
-                image: "alpine"
-                shell: "Sh"
-                command: "git log -n 1 --pretty=format:%H ui > /tmp/ui-sha\n"
-          - step:
-              type: "Run"
-              name: "install-golang"
-              identifier: "installgolang"
-              spec:
-                connectorRef: "dockerdelegatedhruba"
-                image: "alpine"
-                shell: "Sh"
-                command: "source export PATH=\"${GOPATH}/bin:${HOME}/goinstall/go/bin:$PATH\
-                  \ && make deps"
-          - step:
-              type: "Run"
-              name: "restore compiled ui assets"
-              identifier: "restore_compiled_ui_assets"
-              spec:
-                connectorRef: "dockerdelegatedhruba"
-                image: "alpine"
-                shell: "Sh"
-                command: "export GO_TAGS=\"ui $(grep -e '^GO_TAGS ?=' ./GNUmakefile\
-                  \ | cut -d= -f2)\"\n            make pkg/windows_amd64.zip pkg/linux_amd64.zip"
-        platform:
-          os: "Linux"
-          arch: "Amd64"
-        runtime:
-          type: "Docker"
-          spec: {}
+                    connectorRef: dockerdelegatedhruba
+                    image: node:14.17.1
+                    shell: Sh
+                    command: cd ui && yarn install --frozen-lockfile
+              - step:
+                  type: Run
+                  name: save_cache
+                  identifier: save_cache
+                  spec:
+                    connectorRef: dockerdelegatedhruba
+                    image: node:14.17.1
+                    shell: Sh
+                    command: cd ui && yarn run lint:<+matrix.deps>
+                    reports:
+                      type: JUnit
+                      spec:
+                        paths:
+                          - ./ui/node_modules
+                  failureStrategies: []
+                  strategy:
+                    matrix:
+                      deps:
+                        - js
+                        - hbs
+                      maxConcurrency: 1
+          platform:
+            os: Linux
+            arch: Amd64
+          runtime:
+            type: Cloud
+            spec: {}
+    - stage:
+        name: test
+        identifier: test
+        description: ""
+        type: CI
+        spec:
+          cloneCodebase: true
+          platform:
+            os: Linux
+            arch: Amd64
+          runtime:
+            type: Cloud
+            spec: {}
+          execution:
+            steps:
+              - step:
+                  type: Run
+                  name: Install Vault
+                  identifier: Install_Vault
+                  spec:
+                    shell: Sh
+                    command: |-
+                      set -x
+                                  case "linux" in
+                                    linux*)  os="linux" ;;
+                                    darwin*) os="darwin" ;;
+                                    msys*)   os="windows" ;;
+                                    *)       echo "unknown os:" <+pipeline.variables.OSTYPE>; exit 1 ;;
+                                  esac
+                                  curl -SL --fail -o /tmp/vault.zip https://releases.hashicorp.com/vault/1.2.4/vault_1.2.4_linux_amd64.zip
+                                  if [[ <+pipeline.variables.OSTYPE> != "windows" ]]; then
+                                    sudo unzip -d /usr/local/bin /tmp/vault.zip
+                                    rm -rf /tmp/vault*
+                                  else
+                                    rm -rf c:\Windows\vault.exe
+                                    unzip /tmp/vault.zip -d "/c/Windows"
+                                    rm -rf /tmp/vault*
+                                  fi
+    - stage:
+        name: build-binaries
+        identifier: buildbinaries
+        description: ""
+        type: CI
+        spec:
+          cloneCodebase: true
+          execution:
+            steps:
+              - step:
+                  type: Run
+                  name: checkout
+                  identifier: checkout
+                  spec:
+                    connectorRef: dockerdelegatedhruba
+                    image: alpine
+                    shell: Sh
+                    command: apt-get update; apt-get install -y sudo unzip zip
+              - step:
+                  type: Run
+                  name: make deps
+                  identifier: make_deps
+                  spec:
+                    connectorRef: dockerdelegatedhruba
+                    image: alpine
+                    shell: Sh
+                    command: make deps
+              - step:
+                  type: Run
+                  name: install-buf
+                  identifier: installbuf
+                  spec:
+                    connectorRef: dockerdelegatedhruba
+                    image: alpine
+                    shell: Sh
+                    command: sudo ./scripts/vagrant-linux-priv-buf.sh
+              - step:
+                  type: Run
+                  name: prepare ui cache
+                  identifier: prepare_ui_cache
+                  spec:
+                    connectorRef: dockerdelegatedhruba
+                    image: alpine
+                    shell: Sh
+                    command: |
+                      git log -n 1 --pretty=format:%H ui > /tmp/ui-sha
+              - step:
+                  type: Run
+                  name: install-golang
+                  identifier: installgolang
+                  spec:
+                    connectorRef: dockerdelegatedhruba
+                    image: alpine
+                    shell: Sh
+                    command: source export PATH="${GOPATH}/bin:${HOME}/goinstall/go/bin:$PATH && make deps
+              - step:
+                  type: Run
+                  name: restore compiled ui assets
+                  identifier: restore_compiled_ui_assets
+                  spec:
+                    connectorRef: dockerdelegatedhruba
+                    image: alpine
+                    shell: Sh
+                    command: |-
+                      export GO_TAGS="ui $(grep -e '^GO_TAGS ?=' ./GNUmakefile | cut -d= -f2)"
+                                  make pkg/windows_amd64.zip pkg/linux_amd64.zip
+          platform:
+            os: Linux
+            arch: Amd64
+          runtime:
+            type: Docker
+            spec: {}
   variables:
-  - name: "OSTYPE"
-    type: "String"
-    description: ""
-    value: "<+input>"
-  - name: "go_machine_image"
-    type: "String"
-    description: ""
-    value: "&go_machine_image     ubuntu-2004:202111-02"
+    - name: OSTYPE
+      type: String
+      description: ""
+      value: <+input>
+    - name: go_machine_image
+      type: String
+      description: ""
+      value: "&go_machine_image     ubuntu-2004:202111-02"
   properties:
     ci:
       codebase:
-        connectorRef: "dhrubaaccountconnector"
-        repoName: "nomad"
-        build: "<+input>"
-  identifier: "nomadtest_Clone"
-  name: "nomad-test - Clone"
+        connectorRef: dhrubaaccountconnector
+        repoName: nomad
+        build: <+input>
+  identifier: nomadtest_Clone
+  name: nomad-test - Clone
