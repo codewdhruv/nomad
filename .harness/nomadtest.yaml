@@ -20,7 +20,7 @@ pipeline:
                   identifier: yarn_install
                   spec:
                     connectorRef: dockerdelegatedhruba
-                    image: yarnpkg/node-yarn
+                    image: node:latest
                     shell: Sh
                     command: cd ui && yarn install --frozen-lockfile
               - step:
@@ -29,7 +29,7 @@ pipeline:
                   identifier: save_cache
                   spec:
                     connectorRef: dockerdelegatedhruba
-                    image: yarnpkg/node-yarn
+                    image: node:latest
                     shell: Sh
                     command: cd ui && yarn run lint:<+matrix.deps>
                     reports:
