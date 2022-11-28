@@ -44,12 +44,13 @@ pipeline:
                         - js
                         - hbs
                       maxConcurrency: 1
-          platform:
-            os: Linux
-            arch: Amd64
-          runtime:
-            type: Docker
-            spec: {}
+          infrastructure:
+            type: KubernetesDirect
+            spec:
+              connectorRef: k8sdhruba
+              namespace: harness-delegate-ng
+              nodeSelector: {}
+              os: Linux
     - stage:
         name: build-binaries
         identifier: buildbinaries
