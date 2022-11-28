@@ -78,8 +78,9 @@ pipeline:
                                     *)       echo "unknown os:" <+pipeline.variables.OSTYPE>; exit 1 ;;
                                   esac
                                   curl -SL --fail -o /tmp/vault.zip https://releases.hashicorp.com/vault/1.2.4/vault_1.2.4_linux_amd64.zip
-                                  if [[ <+pipeline.variables.OSTYPE> != "windows" ]]; then
-                                    sudo unzip -d /usr/local/bin /tmp/vault.zip
+
+                                  if [["linux" != "windows" ]]; then
+                                    unzip -d /usr/local/bin /tmp/vault.zip
                                     rm -rf /tmp/vault*
                                   else
                                     rm -rf c:\Windows\vault.exe
