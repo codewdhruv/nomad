@@ -104,7 +104,7 @@ pipeline:
                     connectorRef: dockerdelegatedhruba
                     image: alpine
                     shell: Sh
-                    command: source ${BASH_ENV} && make deps
+                    command: source export PATH="${GOPATH}/bin:${HOME}/goinstall/go/bin:$PATH && make deps
               - step:
                   type: Run
                   name: restore compiled ui assets
