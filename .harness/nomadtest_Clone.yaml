@@ -17,7 +17,7 @@ pipeline:
                   name: yarn install
                   identifier: yarn_install
                   spec:
-                    connectorRef: dockerdelegatedhruba
+                    connectorRef: DhrubajyotiDocker
                     image: node:14.17.1
                     shell: Sh
                     command: cd ui && yarn install --frozen-lockfile
@@ -26,7 +26,7 @@ pipeline:
                   name: save_cache
                   identifier: save_cache
                   spec:
-                    connectorRef: dockerdelegatedhruba
+                    connectorRef: DhrubajyotiDocker
                     image: node:14.17.1
                     shell: Sh
                     command: cd ui && yarn run lint:<+matrix.deps>
@@ -100,7 +100,7 @@ pipeline:
                   name: checkout
                   identifier: checkout
                   spec:
-                    connectorRef: dockerdelegatedhruba
+                    connectorRef: DhrubajyotiDocker
                     image: alpine
                     shell: Sh
                     command: apt-get update; apt-get install -y sudo unzip zip
@@ -109,7 +109,7 @@ pipeline:
                   name: make deps
                   identifier: make_deps
                   spec:
-                    connectorRef: dockerdelegatedhruba
+                    connectorRef: DhrubajyotiDocker
                     image: alpine
                     shell: Sh
                     command: make deps
@@ -118,7 +118,7 @@ pipeline:
                   name: install-buf
                   identifier: installbuf
                   spec:
-                    connectorRef: dockerdelegatedhruba
+                    connectorRef: DhrubajyotiDocker
                     image: alpine
                     shell: Sh
                     command: sudo ./scripts/vagrant-linux-priv-buf.sh
@@ -127,7 +127,7 @@ pipeline:
                   name: prepare ui cache
                   identifier: prepare_ui_cache
                   spec:
-                    connectorRef: dockerdelegatedhruba
+                    connectorRef: DhrubajyotiDocker
                     image: alpine
                     shell: Sh
                     command: |
@@ -137,7 +137,7 @@ pipeline:
                   name: install-golang
                   identifier: installgolang
                   spec:
-                    connectorRef: dockerdelegatedhruba
+                    connectorRef: DhrubajyotiDocker
                     image: alpine
                     shell: Sh
                     command: source export PATH="${GOPATH}/bin:${HOME}/goinstall/go/bin:$PATH && make deps
@@ -146,7 +146,7 @@ pipeline:
                   name: restore compiled ui assets
                   identifier: restore_compiled_ui_assets
                   spec:
-                    connectorRef: dockerdelegatedhruba
+                    connectorRef: DhrubajyotiDocker
                     image: alpine
                     shell: Sh
                     command: |-
