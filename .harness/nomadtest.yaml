@@ -44,14 +44,12 @@ pipeline:
                         - js
                         - hbs
                       maxConcurrency: 1
-          infrastructure:
-            type: KubernetesDirect
-            spec:
-              connectorRef: k8sdhruba
-              namespace: default
-              automountServiceAccountToken: true
-              nodeSelector: {}
-              os: Linux
+          platform:
+            os: Linux
+            arch: Amd64
+          runtime:
+            type: Docker
+            spec: {}
     - stage:
         name: build-binaries
         identifier: buildbinaries
@@ -132,6 +130,6 @@ pipeline:
   properties:
     ci:
       codebase:
-        connectorRef: dhrubagithubdelegateconnector
+        connectorRef: dhrubaaccountconnector
         repoName: nomad
         build: <+input>
