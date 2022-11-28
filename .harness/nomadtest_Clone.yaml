@@ -4,8 +4,8 @@ pipeline:
   tags: {}
   stages:
     - stage:
-        name: test-ui
-        identifier: testui
+        name: build-binaries
+        identifier: buildbinaries
         description: ""
         type: CI
         spec:
@@ -14,34 +14,28 @@ pipeline:
             steps:
               - step:
                   type: Run
-                  name: yarn install
-                  identifier: yarn_install
+                  name: "build binaries "
+                  identifier: checkout
                   spec:
                     connectorRef: DhrubajyotiDocker
-                    image: node:14.17.1
+                    image: docker.mirror.hashicorp.services/golang:1.19.3
                     shell: Sh
-                    command: cd ui && yarn install --frozen-lockfile
-              - step:
-                  type: Run
-                  name: save_cache
-                  identifier: save_cache
-                  spec:
-                    connectorRef: DhrubajyotiDocker
-                    image: node:14.17.1
-                    shell: Sh
-                    command: cd ui && yarn run lint:<+matrix.deps>
-                    reports:
-                      type: JUnit
-                      spec:
-                        paths:
-                          - ./ui/node_modules
-                  failureStrategies: []
-                  strategy:
-                    matrix:
-                      deps:
-                        - js
-                        - hbs
-                      maxConcurrency: 1
+                    command: |+
+                      NOMAD_SLOW_TEST=1
+                          GOTESTSUM_JUNITFILE=“/tmp/test-reports/results.xml”
+                          GOTESTSUM_JSONFILE=“/tmp/test-reports/testjsonfile.json”
+                          # disable implicit git paging.  CircleCI runs commands with in a tty
+                          # making git assume it’s an interactive session.
+                          PAGER=“cat”
+                          GIT_PAGER=“cat”
+                          GOPATH="/go"
+
+                      apt-get update; apt-get install -y sudo unzip zip
+                      make deps
+                      sudo -E PATH="$GOPATH/bin:/usr/local/go/bin:$PATH" make generate-structs
+
+                      git log -n 1 --pretty=format:%H ui > /tmp/ui-sha
+
           platform:
             os: Linux
             arch: Amd64
@@ -88,8 +82,8 @@ pipeline:
                                     rm -rf /tmp/vault*
                                   fi
     - stage:
-        name: build-binaries
-        identifier: buildbinaries
+        name: test-ui
+        identifier: testui
         description: ""
         type: CI
         spec:
@@ -98,28 +92,34 @@ pipeline:
             steps:
               - step:
                   type: Run
-                  name: "build binaries "
-                  identifier: checkout
+                  name: yarn install
+                  identifier: yarn_install
                   spec:
                     connectorRef: DhrubajyotiDocker
-                    image: docker.mirror.hashicorp.services/golang:1.19.3
+                    image: node:14.17.1
                     shell: Sh
-                    command: |+
-                      NOMAD_SLOW_TEST=1
-                          GOTESTSUM_JUNITFILE=“/tmp/test-reports/results.xml”
-                          GOTESTSUM_JSONFILE=“/tmp/test-reports/testjsonfile.json”
-                          # disable implicit git paging.  CircleCI runs commands with in a tty
-                          # making git assume it’s an interactive session.
-                          PAGER=“cat”
-                          GIT_PAGER=“cat”
-                          GOPATH="/go"
-
-                      apt-get update; apt-get install -y sudo unzip zip
-                      make deps
-                      sudo -E PATH="$GOPATH/bin:/usr/local/go/bin:$PATH" make generate-structs
-
-                      git log -n 1 --pretty=format:%H ui > /tmp/ui-sha
-
+                    command: cd ui && yarn install --frozen-lockfile
+              - step:
+                  type: Run
+                  name: save_cache
+                  identifier: save_cache
+                  spec:
+                    connectorRef: DhrubajyotiDocker
+                    image: node:14.17.1
+                    shell: Sh
+                    command: cd ui && yarn run lint:<+matrix.deps>
+                    reports:
+                      type: JUnit
+                      spec:
+                        paths:
+                          - ./ui/node_modules
+                  failureStrategies: []
+                  strategy:
+                    matrix:
+                      deps:
+                        - js
+                        - hbs
+                      maxConcurrency: 1
           platform:
             os: Linux
             arch: Amd64
