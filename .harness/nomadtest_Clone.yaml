@@ -20,7 +20,7 @@ pipeline:
                     connectorRef: DhrubajyotiDocker
                     image: docker.mirror.hashicorp.services/golang:1.19.3
                     shell: Sh
-                    command: |+
+                    command: |-
                       NOMAD_SLOW_TEST=1
                           GOTESTSUM_JUNITFILE=“/tmp/test-reports/results.xml”
                           GOTESTSUM_JSONFILE=“/tmp/test-reports/testjsonfile.json”
@@ -29,6 +29,7 @@ pipeline:
                           PAGER=“cat”
                           GIT_PAGER=“cat”
                           GOPATH="/go"
+                          HOME
 
                       apt-get update; apt-get install -y sudo unzip zip
                       make deps
@@ -36,6 +37,18 @@ pipeline:
 
                       git log -n 1 --pretty=format:%H ui > /tmp/ui-sha
 
+                                  if [[ -f /tmp/ui-assets/bindata_assetfs.go ]]; then
+                                    cp /tmp/ui-assets/bindata_assetfs.go ./command/agent/bindata_assetfs.go
+                                    exit 0
+                                  fi
+                                  ./scripts/vagrant-linux-unpriv-ui.sh
+                                  export PATH="$HOME/.yarn/bin:$HOME/.config/yarn/global/node_modules/.bin:$PATH"
+                                  export PATH="$GOPATH/bin:/usr/local/go/bin:$PATH"
+                                  . ~/.nvm/nvm.sh
+                                  cd ui && yarn install --frozen-lockfile && cd ..
+                                  JOBS=2 make ember-dist static-assets
+                                  mkdir -p /tmp/ui-assets
+                                  cp ./command/agent/bindata_assetfs.go /tmp/ui-assets/bindata_assetfs.go
           platform:
             os: Linux
             arch: Amd64
