@@ -44,14 +44,15 @@ import (
 	psstructs "github.com/hashicorp/nomad/plugins/shared/structs"
 	"github.com/miekg/dns"
 	"github.com/mitchellh/copystructure"
+	"github.com/ryanuber/go-glob"
 	"golang.org/x/crypto/blake2b"
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 )
 
 var (
-	// validPolicyName is used to validate a policy name
-	validPolicyName = regexp.MustCompile("^[a-zA-Z0-9-]{1,128}$")
+	// ValidPolicyName is used to validate a policy name
+	ValidPolicyName = regexp.MustCompile("^[a-zA-Z0-9-]{1,128}$")
 
 	// b32 is a lowercase base32 encoding for use in URL friendly service hashes
 	b32 = base32.NewEncoding(strings.ToLower("abcdefghijklmnopqrstuvwxyz234567"))
@@ -119,6 +120,8 @@ const (
 	ACLRolesDeleteByIDRequestType                MessageType = 54
 	ACLAuthMethodsUpsertRequestType              MessageType = 55
 	ACLAuthMethodsDeleteRequestType              MessageType = 56
+	ACLBindingRulesUpsertRequestType             MessageType = 57
+	ACLBindingRulesDeleteRequestType             MessageType = 58
 
 	// Namespace types were moved from enterprise and therefore start at 64
 	NamespaceUpsertRequestType MessageType = 64
@@ -188,6 +191,11 @@ const (
 	// DefaultBlockingRPCQueryTime is the amount of time we block waiting for a change
 	// if no time is specified. Previously we would wait the MaxBlockingRPCQueryTime.
 	DefaultBlockingRPCQueryTime = 300 * time.Second
+
+	// RateMetric constants are used as labels in RPC rate metrics
+	RateMetricRead  = "read"
+	RateMetricList  = "list"
+	RateMetricWrite = "write"
 )
 
 var (
@@ -293,6 +301,8 @@ type QueryOptions struct {
 	// Reverse is used to reverse the default order of list results.
 	Reverse bool
 
+	identity *AuthenticatedIdentity
+
 	InternalRpcInfo
 }
 
@@ -337,6 +347,18 @@ func (q QueryOptions) IsRead() bool {
 
 func (q QueryOptions) AllowStaleRead() bool {
 	return q.AllowStale
+}
+
+func (q *QueryOptions) GetAuthToken() string {
+	return q.AuthToken
+}
+
+func (q *QueryOptions) SetIdentity(identity *AuthenticatedIdentity) {
+	q.identity = identity
+}
+
+func (q QueryOptions) GetIdentity() *AuthenticatedIdentity {
+	return q.identity
 }
 
 // AgentPprofRequest is used to request a pprof report for a given node.
@@ -399,6 +421,8 @@ type WriteRequest struct {
 	// IdempotencyToken can be used to ensure the write is idempotent.
 	IdempotencyToken string
 
+	identity *AuthenticatedIdentity
+
 	InternalRpcInfo
 }
 
@@ -433,6 +457,70 @@ func (w WriteRequest) IsRead() bool {
 
 func (w WriteRequest) AllowStaleRead() bool {
 	return false
+}
+
+func (w *WriteRequest) GetAuthToken() string {
+	return w.AuthToken
+}
+
+func (w *WriteRequest) SetIdentity(identity *AuthenticatedIdentity) {
+	w.identity = identity
+}
+
+func (w WriteRequest) GetIdentity() *AuthenticatedIdentity {
+	return w.identity
+}
+
+// AuthenticatedIdentity is returned by the Authenticate method on server to
+// return a wrapper around the various elements that can be resolved as an
+// identity. RPC handlers will use the relevant fields for performing
+// authorization.
+//
+// Keeping these fields independent rather than merging them into an ephemeral
+// ACLToken makes the original of the credential clear to RPC handlers, who may
+// have different behavior for internal vs external origins.
+type AuthenticatedIdentity struct {
+	ACLToken *ACLToken
+	Claims   *IdentityClaims
+	ClientID string
+	TLSName  string
+	RemoteIP net.IP
+}
+
+func (ai *AuthenticatedIdentity) GetACLToken() *ACLToken {
+	if ai == nil {
+		return nil
+	}
+	return ai.ACLToken
+}
+
+func (ai *AuthenticatedIdentity) GetClaims() *IdentityClaims {
+	if ai == nil {
+		return nil
+	}
+	return ai.Claims
+}
+
+func (ai *AuthenticatedIdentity) String() string {
+	if ai == nil {
+		return "unauthenticated"
+	}
+	if ai.ACLToken != nil {
+		return fmt.Sprintf("token:%s", ai.ACLToken.AccessorID)
+	}
+	if ai.Claims != nil {
+		return fmt.Sprintf("alloc:%s", ai.Claims.AllocationID)
+	}
+	if ai.ClientID != "" {
+		return fmt.Sprintf("client:%s", ai.ClientID)
+	}
+	return fmt.Sprintf("%s:%s", ai.TLSName, ai.RemoteIP.String())
+}
+
+type RequestWithIdentity interface {
+	GetAuthToken() string
+	SetIdentity(identity *AuthenticatedIdentity)
+	GetIdentity() *AuthenticatedIdentity
 }
 
 // QueryMeta allows a query response to include potentially
@@ -2023,6 +2111,14 @@ type Node struct {
 	// LastDrain contains metadata about the most recent drain operation
 	LastDrain *DrainMetadata
 
+	// LastMissedHeartbeatIndex stores the Raft index when the node last missed
+	// a heartbeat. It resets to zero once the node is marked as ready again.
+	LastMissedHeartbeatIndex uint64
+
+	// LastAllocUpdateIndex stores the Raft index of the last time the node
+	// updatedd its allocations status.
+	LastAllocUpdateIndex uint64
+
 	// Raft Indexes
 	CreateIndex uint64
 	ModifyIndex uint64
@@ -2117,6 +2213,17 @@ func (n *Node) Copy() *Node {
 	return &nn
 }
 
+// UnresponsiveStatus returns true if the node is a status where it is not
+// communicating with the server.
+func (n *Node) UnresponsiveStatus() bool {
+	switch n.Status {
+	case NodeStatusDown, NodeStatusDisconnected:
+		return true
+	default:
+		return false
+	}
+}
+
 // TerminalStatus returns if the current status is terminal and
 // will no longer transition.
 func (n *Node) TerminalStatus() bool {
@@ -2186,6 +2293,10 @@ func (n *Node) ComparableResources() *ComparableResources {
 			DiskMB: int64(n.Resources.DiskMB),
 		},
 	}
+}
+
+func (n *Node) IsInDC(dc string) bool {
+	return glob.Glob(dc, n.Datacenter)
 }
 
 // Stub returns a summarized version of the node
@@ -2584,7 +2695,7 @@ func (p AllocatedPorts) Get(label string) (AllocatedPortMapping, bool) {
 }
 
 type Port struct {
-	// Label is the key for HCL port stanzas: port "foo" {}
+	// Label is the key for HCL port blocks: port "foo" {}
 	Label string
 
 	// Value is the static or dynamic port value. For dynamic ports this
@@ -2896,7 +3007,7 @@ type NodeResources struct {
 
 	// Networks is the node's bridge network and default interface. It is
 	// only used when scheduling jobs with a deprecated
-	// task.resources.network stanza.
+	// task.resources.network block.
 	Networks Networks
 
 	// MinDynamicPort and MaxDynamicPort represent the inclusive port range
@@ -4045,17 +4156,19 @@ const (
 	// JobMinPriority is the minimum allowed priority
 	JobMinPriority = 1
 
-	// JobDefaultPriority is the default priority if not
-	// not specified.
+	// JobDefaultPriority is the default priority if not specified.
 	JobDefaultPriority = 50
 
-	// JobMaxPriority is the maximum allowed priority
-	JobMaxPriority = 100
+	// JobDefaultMaxPriority is the default maximum allowed priority
+	JobDefaultMaxPriority = 100
+
+	// JobMaxPriority is the maximum allowed configuration value for maximum job priority
+	JobMaxPriority = math.MaxInt16 - 1
 
 	// CoreJobPriority should be higher than any user
 	// specified job so that it gets priority. This is important
 	// for the system to remain healthy.
-	CoreJobPriority = JobMaxPriority * 2
+	CoreJobPriority = math.MaxInt16
 
 	// JobTrackedVersions is the number of historic job versions that are
 	// kept.
@@ -4129,7 +4242,7 @@ type Job struct {
 	TaskGroups []*TaskGroup
 
 	// See agent.ApiJobToStructJob
-	// Update provides defaults for the TaskGroup Update stanzas
+	// Update provides defaults for the TaskGroup Update blocks
 	Update UpdateStrategy
 
 	Multiregion *Multiregion
@@ -4188,7 +4301,7 @@ type Job struct {
 	// of a deployment and can be manually set via APIs. This field is updated
 	// when the status of a corresponding deployment transitions to Failed
 	// or Successful. This field is not meaningful for jobs that don't have an
-	// update stanza.
+	// update block.
 	Stable bool
 
 	// Version is a monotonically increasing version number that is incremented
@@ -4256,6 +4369,10 @@ func (j *Job) Canonicalize() {
 	// Ensure the job is in a namespace.
 	if j.Namespace == "" {
 		j.Namespace = DefaultNamespace
+	}
+
+	if len(j.Datacenters) == 0 {
+		j.Datacenters = []string{"*"}
 	}
 
 	for _, tg := range j.TaskGroups {
@@ -4331,9 +4448,6 @@ func (j *Job) Validate() error {
 	default:
 		mErr.Errors = append(mErr.Errors, fmt.Errorf("Invalid job type: %q", j.Type))
 	}
-	if j.Priority < JobMinPriority || j.Priority > JobMaxPriority {
-		mErr.Errors = append(mErr.Errors, fmt.Errorf("Job priority must be between [%d, %d]", JobMinPriority, JobMaxPriority))
-	}
 	if len(j.Datacenters) == 0 && !j.IsMultiregion() {
 		mErr.Errors = append(mErr.Errors, errors.New("Missing job datacenters"))
 	} else {
@@ -4354,7 +4468,7 @@ func (j *Job) Validate() error {
 	}
 	if j.Type == JobTypeSystem {
 		if j.Affinities != nil {
-			mErr.Errors = append(mErr.Errors, fmt.Errorf("System jobs may not have an affinity stanza"))
+			mErr.Errors = append(mErr.Errors, fmt.Errorf("System jobs may not have an affinity block"))
 		}
 	} else {
 		for idx, affinity := range j.Affinities {
@@ -4367,7 +4481,7 @@ func (j *Job) Validate() error {
 
 	if j.Type == JobTypeSystem {
 		if j.Spreads != nil {
-			mErr.Errors = append(mErr.Errors, fmt.Errorf("System jobs may not have a spread stanza"))
+			mErr.Errors = append(mErr.Errors, fmt.Errorf("System jobs may not have a spread block"))
 		}
 	} else {
 		for idx, spread := range j.Spreads {
@@ -6326,15 +6440,27 @@ func (tg *TaskGroup) Canonicalize(job *Job) {
 // NomadServices returns a list of all group and task - level services in tg that
 // are making use of the nomad service provider.
 func (tg *TaskGroup) NomadServices() []*Service {
+	return tg.filterServices(func(s *Service) bool {
+		return s.Provider == ServiceProviderNomad
+	})
+}
+
+func (tg *TaskGroup) ConsulServices() []*Service {
+	return tg.filterServices(func(s *Service) bool {
+		return s.Provider == ServiceProviderConsul || s.Provider == ""
+	})
+}
+
+func (tg *TaskGroup) filterServices(f func(s *Service) bool) []*Service {
 	var services []*Service
 	for _, service := range tg.Services {
-		if service.Provider == ServiceProviderNomad {
+		if f(service) {
 			services = append(services, service)
 		}
 	}
 	for _, task := range tg.Tasks {
 		for _, service := range task.Services {
-			if service.Provider == ServiceProviderNomad {
+			if f(service) {
 				services = append(services, service)
 			}
 		}
@@ -6374,7 +6500,7 @@ func (tg *TaskGroup) Validate(j *Job) error {
 	}
 	if j.Type == JobTypeSystem {
 		if tg.Affinities != nil {
-			mErr.Errors = append(mErr.Errors, fmt.Errorf("System jobs may not have an affinity stanza"))
+			mErr.Errors = append(mErr.Errors, fmt.Errorf("System jobs may not have an affinity block"))
 		}
 	} else {
 		for idx, affinity := range tg.Affinities {
@@ -6395,7 +6521,7 @@ func (tg *TaskGroup) Validate(j *Job) error {
 
 	if j.Type == JobTypeSystem {
 		if tg.Spreads != nil {
-			mErr.Errors = append(mErr.Errors, fmt.Errorf("System jobs may not have a spread stanza"))
+			mErr.Errors = append(mErr.Errors, fmt.Errorf("System jobs may not have a spread block"))
 		}
 	} else {
 		for idx, spread := range tg.Spreads {
@@ -6481,7 +6607,7 @@ func (tg *TaskGroup) Validate(j *Job) error {
 		canaries = tg.Update.Canary
 	}
 	for name, volReq := range tg.Volumes {
-		if err := volReq.Validate(tg.Count, canaries); err != nil {
+		if err := volReq.Validate(j.Type, tg.Count, canaries); err != nil {
 			mErr.Errors = append(mErr.Errors, fmt.Errorf(
 				"Task group volume validation for %s failed: %v", name, err))
 		}
@@ -6736,7 +6862,7 @@ func (tg *TaskGroup) validateServices() error {
 		mErr.Errors = append(mErr.Errors,
 			fmt.Errorf(
 				"Services are not unique: %s",
-				idDuplicateSet.String(
+				idDuplicateSet.StringFunc(
 					func(u unique) string {
 						s := u.task + "->" + u.name
 						if u.port != "" {
@@ -7086,6 +7212,10 @@ type Task struct {
 
 	// CSIPluginConfig is used to configure the plugin supervisor for the task.
 	CSIPluginConfig *TaskCSIPluginConfig
+
+	// Identity controls if and how the workload identity is exposed to
+	// tasks similar to the Vault block.
+	Identity *WorkloadIdentity
 }
 
 // UsesConnect is for conveniently detecting if the Task is able to make use
@@ -7146,6 +7276,7 @@ func (t *Task) Copy() *Task {
 	nt.Meta = maps.Clone(nt.Meta)
 	nt.DispatchPayload = nt.DispatchPayload.Copy()
 	nt.Lifecycle = nt.Lifecycle.Copy()
+	nt.Identity = nt.Identity.Copy()
 
 	if t.Artifacts != nil {
 		artifacts := make([]*TaskArtifact, 0, len(t.Artifacts))
@@ -7271,7 +7402,7 @@ func (t *Task) Validate(ephemeralDisk *EphemeralDisk, jobType string, tgServices
 
 	if jobType == JobTypeSystem {
 		if t.Affinities != nil {
-			mErr.Errors = append(mErr.Errors, fmt.Errorf("System jobs may not have an affinity stanza"))
+			mErr.Errors = append(mErr.Errors, fmt.Errorf("System jobs may not have an affinity block"))
 		}
 	} else {
 		for idx, affinity := range t.Affinities {
@@ -7341,9 +7472,9 @@ func (t *Task) Validate(ephemeralDisk *EphemeralDisk, jobType string, tgServices
 
 	// Validation for TaskKind field which is used for Consul Connect integration
 	if t.Kind.IsConnectProxy() {
-		// This task is a Connect proxy so it should not have service stanzas
+		// This task is a Connect proxy so it should not have service blocks
 		if len(t.Services) > 0 {
-			mErr.Errors = append(mErr.Errors, fmt.Errorf("Connect proxy task must not have a service stanza"))
+			mErr.Errors = append(mErr.Errors, fmt.Errorf("Connect proxy task must not have a service block"))
 		}
 		if t.Leader {
 			mErr.Errors = append(mErr.Errors, fmt.Errorf("Connect proxy task must not have leader set"))
@@ -7536,7 +7667,7 @@ func (t *Task) Warnings() error {
 
 	// Validate the resources
 	if t.Resources != nil && t.Resources.IOPS != 0 {
-		mErr.Errors = append(mErr.Errors, fmt.Errorf("IOPS has been deprecated as of Nomad 0.9.0. Please remove IOPS from resource stanza."))
+		mErr.Errors = append(mErr.Errors, fmt.Errorf("IOPS has been deprecated as of Nomad 0.9.0. Please remove IOPS from resource block."))
 	}
 
 	if t.Resources != nil && len(t.Resources.Networks) != 0 {
@@ -7863,7 +7994,7 @@ func (t *Template) Warnings() error {
 
 	// Deprecation notice for vault_grace
 	if t.VaultGrace != 0 {
-		mErr.Errors = append(mErr.Errors, fmt.Errorf("VaultGrace has been deprecated as of Nomad 0.11 and ignored since Vault 0.5. Please remove VaultGrace / vault_grace from template stanza."))
+		mErr.Errors = append(mErr.Errors, fmt.Errorf("VaultGrace has been deprecated as of Nomad 0.11 and ignored since Vault 0.5. Please remove VaultGrace / vault_grace from template block."))
 	}
 
 	return mErr.ErrorOrNil()
@@ -9033,7 +9164,7 @@ func (s *Spread) Validate() error {
 		mErr.Errors = append(mErr.Errors, errors.New("Missing spread attribute"))
 	}
 	if s.Weight <= 0 || s.Weight > 100 {
-		mErr.Errors = append(mErr.Errors, errors.New("Spread stanza must have a positive weight from 0 to 100"))
+		mErr.Errors = append(mErr.Errors, errors.New("Spread block must have a positive weight from 0 to 100"))
 	}
 	seen := make(map[string]struct{})
 	sumPercent := uint32(0)
@@ -11774,6 +11905,7 @@ type KeyringRequest struct {
 type RecoverableError struct {
 	Err         string
 	Recoverable bool
+	wrapped     error
 }
 
 // NewRecoverableError is used to wrap an error and mark it as recoverable or
@@ -11786,6 +11918,7 @@ func NewRecoverableError(e error, recoverable bool) error {
 	return &RecoverableError{
 		Err:         e.Error(),
 		Recoverable: recoverable,
+		wrapped:     e,
 	}
 }
 
@@ -11806,6 +11939,10 @@ func (r *RecoverableError) IsRecoverable() bool {
 
 func (r *RecoverableError) IsUnrecoverable() bool {
 	return !r.Recoverable
+}
+
+func (r *RecoverableError) Unwrap() error {
+	return r.wrapped
 }
 
 // Recoverable is an interface for errors to implement to indicate whether or
@@ -11926,7 +12063,7 @@ func (a *ACLPolicy) Stub() *ACLPolicyListStub {
 
 func (a *ACLPolicy) Validate() error {
 	var mErr multierror.Error
-	if !validPolicyName.MatchString(a.Name) {
+	if !ValidPolicyName.MatchString(a.Name) {
 		err := fmt.Errorf("invalid name '%s'", a.Name)
 		mErr.Errors = append(mErr.Errors, err)
 	}
@@ -12085,6 +12222,14 @@ var (
 		Type:       ACLClientToken,
 		Policies:   []string{"anonymous"},
 		Global:     false,
+	}
+
+	// LeaderACLToken is used to represent a leader's own token; this object
+	// never gets used except on the leader
+	LeaderACLToken = &ACLToken{
+		AccessorID: "leader",
+		Name:       "Leader Token",
+		Type:       ACLManagementToken,
 	}
 )
 

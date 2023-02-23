@@ -4,11 +4,10 @@ import (
 	"testing"
 
 	"github.com/hashicorp/go-memdb"
-	"github.com/shoenig/test/must"
-
 	"github.com/hashicorp/nomad/ci"
 	"github.com/hashicorp/nomad/nomad/mock"
 	"github.com/hashicorp/nomad/nomad/structs"
+	"github.com/shoenig/test/must"
 )
 
 func TestStateStore_UpsertACLAuthMethods(t *testing.T) {
@@ -226,4 +225,27 @@ func TestStateStore_GetACLAuthMethodByName(t *testing.T) {
 	authMethod, err = testState.GetACLAuthMethodByName(ws, mockedACLAuthMethods[1].Name)
 	must.NoError(t, err)
 	must.Equal(t, mockedACLAuthMethods[1], authMethod)
+}
+
+func TestStateStore_GetDefaultACLAuthMethod(t *testing.T) {
+	ci.Parallel(t)
+	testState := testStateStore(t)
+
+	// Generate 2 auth methods, make one of them default
+	am1 := mock.ACLAuthMethod()
+	am1.Default = true
+	am2 := mock.ACLAuthMethod()
+
+	// upsert
+	mockedACLAuthMethods := []*structs.ACLAuthMethod{am1, am2}
+	must.NoError(t, testState.UpsertACLAuthMethods(10, mockedACLAuthMethods))
+
+	// Get the default method
+	ws := memdb.NewWatchSet()
+	defaultACLAuthMethod, err := testState.GetDefaultACLAuthMethod(ws)
+	must.NoError(t, err)
+
+	must.True(t, defaultACLAuthMethod.Default)
+	must.Eq(t, am1, defaultACLAuthMethod)
+
 }

@@ -40,6 +40,7 @@ import (
 	"github.com/hashicorp/nomad/plugins/drivers"
 	"github.com/hashicorp/nomad/testutil"
 	"github.com/kr/pretty"
+	"github.com/shoenig/test/must"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -146,7 +147,7 @@ func testTaskRunnerConfig(t *testing.T, alloc *structs.Allocation, taskName stri
 		ShutdownDelayCtx:      shutdownDelayCtx,
 		ShutdownDelayCancelFn: shutdownDelayCancelFn,
 		ServiceRegWrapper:     wrapperMock,
-		Getter:                getter.TestDefaultGetter(t),
+		Getter:                getter.TestSandbox(t),
 	}
 
 	// Set the cgroup path getter if we are in v2 mode
@@ -1716,7 +1717,7 @@ func TestTaskRunner_DeriveToken_Unrecoverable(t *testing.T) {
 	require.True(t, state.Events[2].FailsTask)
 }
 
-// TestTaskRunner_Download_Exec asserts that downloaded artifacts may be
+// TestTaskRunner_Download_RawExec asserts that downloaded artifacts may be
 // executed in a driver without filesystem isolation.
 func TestTaskRunner_Download_RawExec(t *testing.T) {
 	ci.Parallel(t)
@@ -1727,6 +1728,7 @@ func TestTaskRunner_Download_RawExec(t *testing.T) {
 	// Create a task that downloads a script and executes it.
 	alloc := mock.BatchAlloc()
 	alloc.Job.TaskGroups[0].RestartPolicy = &structs.RestartPolicy{}
+
 	task := alloc.Job.TaskGroups[0].Tasks[0]
 	task.RestartPolicy = &structs.RestartPolicy{}
 	task.Driver = "raw_exec"
@@ -2520,4 +2522,64 @@ func TestTaskRunner_BaseLabels(t *testing.T) {
 	require.Equal(task.Name, labels["task"])
 	require.Equal(alloc.ID, labels["alloc_id"])
 	require.Equal(alloc.Namespace, labels["namespace"])
+}
+
+// TestTaskRunner_IdentityHook_Enabled asserts that the identity hook exposes a
+// workload identity to a task.
+func TestTaskRunner_IdentityHook_Enabled(t *testing.T) {
+	ci.Parallel(t)
+
+	alloc := mock.BatchAlloc()
+	task := alloc.Job.TaskGroups[0].Tasks[0]
+
+	// Fake an identity and expose it to the task
+	alloc.SignedIdentities = map[string]string{
+		task.Name: "foo",
+	}
+	task.Identity = &structs.WorkloadIdentity{
+		Env:  true,
+		File: true,
+	}
+
+	tr, _, cleanup := runTestTaskRunner(t, alloc, task.Name)
+	defer cleanup()
+
+	testWaitForTaskToDie(t, tr)
+
+	// Assert the token was written to the filesystem
+	tokenBytes, err := os.ReadFile(filepath.Join(tr.taskDir.SecretsDir, "nomad_token"))
+	must.NoError(t, err)
+	must.Eq(t, "foo", string(tokenBytes))
+
+	// Assert the token is built into the task env
+	taskEnv := tr.envBuilder.Build()
+	must.Eq(t, "foo", taskEnv.EnvMap["NOMAD_TOKEN"])
+}
+
+// TestTaskRunner_IdentityHook_Disabled asserts that the identity hook does not
+// expose a workload identity to a task by default.
+func TestTaskRunner_IdentityHook_Disabled(t *testing.T) {
+	ci.Parallel(t)
+
+	alloc := mock.BatchAlloc()
+	task := alloc.Job.TaskGroups[0].Tasks[0]
+
+	// Fake an identity but don't expose it to the task
+	alloc.SignedIdentities = map[string]string{
+		task.Name: "foo",
+	}
+	task.Identity = nil
+
+	tr, _, cleanup := runTestTaskRunner(t, alloc, task.Name)
+	defer cleanup()
+
+	testWaitForTaskToDie(t, tr)
+
+	// Assert the token was written to the filesystem
+	_, err := os.ReadFile(filepath.Join(tr.taskDir.SecretsDir, "nomad_token"))
+	must.Error(t, err)
+
+	// Assert the token is built into the task env
+	taskEnv := tr.envBuilder.Build()
+	must.MapNotContainsKey(t, taskEnv.EnvMap, "NOMAD_TOKEN")
 }

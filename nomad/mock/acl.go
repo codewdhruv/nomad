@@ -226,11 +226,12 @@ func ACLAuthMethod() *structs.ACLAuthMethod {
 		Type:          "OIDC",
 		TokenLocality: "local",
 		MaxTokenTTL:   maxTokenTTL,
-		Default:       true,
+		Default:       false,
 		Config: &structs.ACLAuthMethodConfig{
 			OIDCDiscoveryURL:    "http://example.com",
 			OIDCClientID:        "mock",
 			OIDCClientSecret:    "very secret secret",
+			OIDCScopes:          []string{"groups"},
 			BoundAudiences:      []string{"audience1", "audience2"},
 			AllowedRedirectURIs: []string{"foo", "bar"},
 			DiscoveryCaPem:      []string{"foo"},
@@ -243,5 +244,21 @@ func ACLAuthMethod() *structs.ACLAuthMethod {
 		ModifyIndex: 10,
 	}
 	method.SetHash()
+	method.Canonicalize()
 	return &method
+}
+
+func ACLBindingRule() *structs.ACLBindingRule {
+	return &structs.ACLBindingRule{
+		ID:          uuid.Short(),
+		Description: "mocked-acl-binding-rule",
+		AuthMethod:  "auth0",
+		Selector:    "engineering in list.roles",
+		BindType:    "role",
+		BindName:    "eng-ro",
+		CreateTime:  time.Now().UTC(),
+		ModifyTime:  time.Now().UTC(),
+		CreateIndex: 10,
+		ModifyIndex: 10,
+	}
 }

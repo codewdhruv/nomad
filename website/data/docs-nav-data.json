@@ -82,6 +82,10 @@
         "path": "concepts"
       },
       {
+        "title": "ACL",
+        "path": "concepts/acl"
+      },
+      {
         "title": "Architecture",
         "path": "concepts/architecture"
       },
@@ -107,6 +111,10 @@
           {
             "title": "Storage",
             "path": "concepts/plugins/csi"
+          },
+          {
+            "title": "Networking",
+            "path": "concepts/plugins/cni"
           }
         ]
       },
@@ -235,6 +243,56 @@
           {
             "title": "bootstrap",
             "path": "commands/acl/bootstrap"
+          },
+          {
+            "title": "auth-method",
+            "routes": [
+              {
+                "title": "create",
+                "path": "commands/acl/auth-method/create"
+              },
+              {
+                "title": "delete",
+                "path": "commands/acl/auth-method/delete"
+              },
+              {
+                "title": "info",
+                "path": "commands/acl/auth-method/info"
+              },
+              {
+                "title": "list",
+                "path": "commands/acl/auth-method/list"
+              },
+              {
+                "title": "update",
+                "path": "commands/acl/auth-method/update"
+              }
+            ]
+          },
+          {
+            "title": "binding-rule",
+            "routes": [
+              {
+                "title": "create",
+                "path": "commands/acl/binding-rule/create"
+              },
+              {
+                "title": "delete",
+                "path": "commands/acl/binding-rule/delete"
+              },
+              {
+                "title": "info",
+                "path": "commands/acl/binding-rule/info"
+              },
+              {
+                "title": "list",
+                "path": "commands/acl/binding-rule/list"
+              },
+              {
+                "title": "update",
+                "path": "commands/acl/binding-rule/update"
+              }
+            ]
           },
           {
             "title": "policy",
@@ -524,6 +582,10 @@
         ]
       },
       {
+        "title": "login",
+        "path": "commands/login"
+      },
+      {
         "title": "monitor",
         "path": "commands/monitor"
       },
@@ -606,6 +668,10 @@
             ]
           },
           {
+            "title": "client-state",
+            "path": "commands/operator/client-state"
+          },
+          {
             "title": "debug",
             "path": "commands/operator/debug"
           },
@@ -633,14 +699,6 @@
                 "path": "commands/operator/gossip/keyring-use"
               }
             ]
-          },
-          {
-            "title": "keygen",
-            "path": "commands/operator/keygen"
-          },
-          {
-            "title": "keyring",
-            "path": "commands/operator/keyring"
           },
           {
             "title": "metrics",
@@ -1504,6 +1562,10 @@
         "path": "job-specification/group"
       },
       {
+        "title": "identity",
+        "path": "job-specification/identity"
+      },
+      {
         "title": "job",
         "path": "job-specification/job"
       },
@@ -1615,6 +1677,10 @@
       {
         "title": "ACL Policy",
         "path": "other-specifications/acl-policy"
+      },
+      {
+        "title": "Variables",
+        "path": "other-specifications/variables"
       },
       {
         "title": "Volume",
@@ -1792,6 +1858,27 @@
       {
         "title": "Variable Interpolation",
         "path": "runtime/interpolation"
+      }
+    ]
+  },
+  {
+    "title": "Networking",
+    "routes": [
+      {
+        "title": "Overview",
+        "path": "networking"
+      },
+      {
+        "title": "Service Discovery",
+        "path": "networking/service-discovery"
+      },
+      {
+        "title": "Service Mesh",
+        "path": "networking/service-mesh"
+      },
+      {
+        "title": "CNI",
+        "path": "networking/cni"
       }
     ]
   },

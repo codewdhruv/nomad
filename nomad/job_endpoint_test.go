@@ -829,7 +829,7 @@ func TestJobEndpoint_Register_ConnectWithSidecarTask(t *testing.T) {
 	require.Equal("connect-proxy:backend", string(sidecarTask.Kind))
 	require.Equal("connect-proxy-backend", out.TaskGroups[0].Networks[0].DynamicPorts[0].Label)
 
-	// Check that the correct fields were overridden from the sidecar_task stanza
+	// Check that the correct fields were overridden from the sidecar_task block
 	require.Equal("test", sidecarTask.Meta["source"])
 	require.Equal(500, sidecarTask.Resources.CPU)
 	require.Equal(connectSidecarResources().MemoryMB, sidecarTask.Resources.MemoryMB)
@@ -6316,7 +6316,7 @@ func TestJobEndpoint_Plan_NoDiff(t *testing.T) {
 }
 
 // TestJobEndpoint_Plan_Scaling asserts that the plan endpoint handles
-// jobs with scaling stanza
+// jobs with scaling block
 func TestJobEndpoint_Plan_Scaling(t *testing.T) {
 	ci.Parallel(t)
 
@@ -6649,6 +6649,61 @@ func TestJobEndpoint_ValidateJobUpdate_ACL(t *testing.T) {
 
 	require.Equal("", validResp.Error)
 	require.Equal("", validResp.Warnings)
+}
+
+func TestJobEndpoint_ValidateJob_PriorityNotOk(t *testing.T) {
+	ci.Parallel(t)
+
+	s1, cleanupS1 := TestServer(t, nil)
+	defer cleanupS1()
+	codec := rpcClient(t, s1)
+	testutil.WaitForLeader(t, s1.RPC)
+
+	validateJob := func(j *structs.Job) error {
+		req := &structs.JobRegisterRequest{
+			Job: j,
+			WriteRequest: structs.WriteRequest{
+				Region:    "global",
+				Namespace: j.Namespace,
+			},
+		}
+		var resp structs.JobValidateResponse
+		if err := msgpackrpc.CallWithCodec(codec, "Job.Validate", req, &resp); err != nil {
+			return err
+		}
+
+		if resp.Error != "" {
+			return errors.New(resp.Error)
+		}
+
+		if len(resp.ValidationErrors) != 0 {
+			return errors.New(strings.Join(resp.ValidationErrors, ","))
+		}
+
+		if resp.Warnings != "" {
+			return errors.New(resp.Warnings)
+		}
+
+		return nil
+	}
+
+	t.Run("job with invalid min priority", func(t *testing.T) {
+		j := mock.Job()
+		j.Priority = -1
+
+		err := validateJob(j)
+		must.Error(t, err)
+		must.ErrorContains(t, err, "job priority must be between")
+	})
+
+	t.Run("job with invalid max priority", func(t *testing.T) {
+		j := mock.Job()
+		j.Priority = 101
+
+		err := validateJob(j)
+		must.Error(t, err)
+		must.ErrorContains(t, err, "job priority must be between")
+	})
 }
 
 func TestJobEndpoint_Dispatch_ACL(t *testing.T) {

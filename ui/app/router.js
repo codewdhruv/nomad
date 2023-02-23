@@ -14,7 +14,13 @@ Router.map(function () {
   });
 
   this.route('jobs', function () {
-    this.route('run');
+    this.route('run', function () {
+      this.route('templates', function () {
+        this.route('new');
+        this.route('manage');
+        this.route('template', { path: '/:name' });
+      });
+    });
     this.route('job', { path: '/:job_name' }, function () {
       this.route('task-group', { path: '/:name' });
       this.route('definition');
@@ -96,6 +102,14 @@ Router.map(function () {
 
     this.route('path', {
       path: '/path/*absolutePath',
+    });
+  });
+
+  this.route('policies', function () {
+    this.route('new');
+
+    this.route('policy', {
+      path: '/:name',
     });
   });
   // Mirage-only route for testing OIDC flow
