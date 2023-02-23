@@ -1,0 +1,81 @@
+pipeline:
+  name: nomad-test
+  identifier: nomadtest
+  projectIdentifier: NgLabs
+  orgIdentifier: default
+  tags: {}
+  stages:
+    - stage:
+        name: test-ui
+        identifier: testui
+        description: ""
+        type: CI
+        spec:
+          cloneCodebase: true
+          platform:
+            os: Linux
+            arch: Amd64
+          runtime:
+            type: Cloud
+            spec: {}
+          execution:
+            steps:
+              - step:
+                  type: Run
+                  name: yarn install
+                  identifier: yarn_install
+                  spec:
+                    connectorRef: harnessnew
+                    image: docker.mirror.hashicorp.services/circleci/node:14-browsers
+                    shell: Sh
+                    command: |-
+                      #!/bin/bash -eo pipefail
+                      cd ui && yarn install --frozen-lockfile
+              - step:
+                  type: Run
+                  name: lintjs
+                  identifier: lintjs
+                  spec:
+                    connectorRef: harnessnew
+                    image: docker-mirror.hashi.app/circleci/node:14-browsers
+                    shell: Sh
+                    command: |-
+                      #!/bin/bash -eo pipefail
+                      cd ui && yarn run lint:js
+                  when:
+                    stageStatus: All
+                  failureStrategies: []
+              - step:
+                  type: Run
+                  name: linthbs
+                  identifier: linthbs
+                  spec:
+                    connectorRef: harnessnew
+                    image: docker-mirror.hashi.app/circleci/node:14-browsers
+                    shell: Sh
+                    command: |-
+                      #!/bin/bash -eo pipefail
+                      cd ui && yarn run lint:hbs
+                  when:
+                    stageStatus: All
+                  failureStrategies: []
+              - step:
+                  type: Run
+                  name: ember tests
+                  identifier: ember_tests
+                  spec:
+                    connectorRef: harnessnew
+                    image: docker-mirror.hashi.app/circleci/node:14-browsers
+                    shell: Sh
+                    command: |-
+                      #!/bin/bash -eo pipefail
+                      mkdir -p /tmp/test-reports && cd ui && yarn test
+                  when:
+                    stageStatus: All
+                  failureStrategies: []
+  properties:
+    ci:
+      codebase:
+        connectorRef: gitconnectordhruba
+        repoName: nomad
+        build: <+input>
